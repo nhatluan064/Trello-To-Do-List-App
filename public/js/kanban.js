@@ -20,9 +20,10 @@ const Kanban = {
   // Socket.IO — kết nối 1 lần duy nhất
   initSocket() {
     if (this.socket) return; // Đã kết nối
-    this.socket = io();
-    
-    this.socket.on('connect', () => {
+    if (typeof io !== 'undefined') {
+      this.socket = io();
+      
+      this.socket.on('connect', () => {
       console.log('🔌 Realtime connected:', this.socket.id);
     });
 
@@ -34,6 +35,10 @@ const Kanban = {
         this.silentReload();
       }
     });
+
+    } else {
+      console.warn("Socket.io not loaded!");
+    }
   },
 
   // Reload board mà không ảnh hưởng UX (không toast, không đổi view)
@@ -87,7 +92,7 @@ const Kanban = {
 
       this.render();
     } catch (err) {
-      App.toast(err.message, 'error');
+      App.showToast(err.message, 'error');
     }
   },
 

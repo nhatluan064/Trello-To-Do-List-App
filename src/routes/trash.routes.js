@@ -83,7 +83,6 @@ router.post('/restore-batch', requireAuth, (req, res) => {
 
     if (!items || !Array.isArray(items)) return res.status(400).json({ error: 'Dữ liệu không hợp lệ.' });
 
-    db.run('BEGIN TRANSACTION');
     for (const item of items) {
       if (item.type === 'board') {
         db.run('UPDATE boards SET is_deleted = 0, deleted_at = NULL WHERE id = ?', [item.id]);
@@ -93,12 +92,10 @@ router.post('/restore-batch', requireAuth, (req, res) => {
         db.run('UPDATE cards SET is_deleted = 0, deleted_at = NULL WHERE id = ?', [item.id]);
       }
     }
-    db.run('COMMIT');
 
     res.json({ message: 'Phục hồi thành công!' });
   } catch (err) {
     console.error('Batch restore error:', err);
-    getDb(req).run('ROLLBACK');
     res.status(500).json({ error: 'Lỗi server.' });
   }
 });
@@ -111,7 +108,6 @@ router.post('/delete-batch', requireAuth, (req, res) => {
 
     if (!items || !Array.isArray(items)) return res.status(400).json({ error: 'Dữ liệu không hợp lệ.' });
 
-    db.run('BEGIN TRANSACTION');
     for (const item of items) {
       if (item.type === 'board') {
         db.run('DELETE FROM boards WHERE id = ?', [item.id]);
@@ -121,12 +117,10 @@ router.post('/delete-batch', requireAuth, (req, res) => {
         db.run('DELETE FROM cards WHERE id = ?', [item.id]);
       }
     }
-    db.run('COMMIT');
 
     res.json({ message: 'Xóa vĩnh viễn thành công!' });
   } catch (err) {
     console.error('Batch delete error:', err);
-    getDb(req).run('ROLLBACK');
     res.status(500).json({ error: 'Lỗi server.' });
   }
 });

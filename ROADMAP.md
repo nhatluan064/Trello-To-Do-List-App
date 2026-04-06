@@ -98,6 +98,7 @@
 - [x] **Frontend Listen**: `kanban.js` kết nối Socket, lắng nghe sự kiện và tự động `silentReload()` mà không làm gián đoạn UX.
 - [x] **Avatar Cluster**: Hiển thị tối đa 3 avatar xếp chồng + badge "+N" trên mỗi thẻ ngoài Bảng.
 - [x] **Bug Sweep**: Quét sạch toàn bộ `req.user.id` còn sót → `req.session.userId` (column, trash, template routes).
+- [x] **Thùng rác nâng cao (Batch Action)**: Hỗ trợ "Chọn tất cả" bằng Checkbox, Nút Xóa Vĩnh Viễn hàng loạt và Nút Khôi Phục hàng loạt. Đã xử lý triệt để bug treo hệ thống khi Auto-commit va chạm với Transactions thủ công trong `sql.js`.
 
 ---
 

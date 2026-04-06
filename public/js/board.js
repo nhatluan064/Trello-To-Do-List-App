@@ -12,7 +12,7 @@ const Board = {
       this.boards = await API.getBoards();
       this.renderBoardList();
     } catch (err) {
-      App.toast(err.message, 'error');
+      App.showToast(err.message, 'error');
     }
   },
 
