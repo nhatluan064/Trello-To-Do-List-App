@@ -61,6 +61,13 @@ const API = {
   createColumn(data) { return this.request('POST', '/columns', data); },
   updateColumn(id, data) { return this.request('PUT', `/columns/${id}`, data); },
   deleteColumn(id) { return this.request('DELETE', `/columns/${id}`); },
+
+  // Templates
+  getTemplates() { return this.request('GET', '/templates'); },
+  createTemplate(data) { return this.request('POST', '/templates', data); },
+  updateTemplate(id, data) { return this.request('PUT', `/templates/${id}`, data); },
+  deleteTemplate(id) { return this.request('DELETE', `/templates/${id}`); },
+
   reorderColumns(columns) { return this.request('PUT', '/columns/reorder/batch', { columns }); },
 
   // Cards

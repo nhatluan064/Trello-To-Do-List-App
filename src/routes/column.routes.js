@@ -20,6 +20,9 @@ router.post('/', (req, res) => {
     const result = db.run('INSERT INTO columns (board_id, title, position) VALUES (?, ?, ?)', [parseInt(boardId), title.trim(), position]);
 
     res.status(201).json({ id: result.lastInsertRowid, boardId, title: title.trim(), position, cards: [] });
+
+    // Socket: thông báo board reload
+    req.app.get('io').to('board-' + boardId).emit('board-updated', { action: 'column-created' });
   } catch (err) {
     console.error('Create column error:', err);
     res.status(500).json({ error: 'Lỗi server.' });
@@ -49,15 +52,28 @@ router.delete('/:id', (req, res) => {
     const db = getDb(req);
     const { id } = req.params;
 
-    // Manual cascade delete
-    db.run('DELETE FROM comments WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)', [parseInt(id)]);
-    db.run('DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)', [parseInt(id)]);
-    db.run('DELETE FROM cards WHERE column_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM columns WHERE id = ?', [parseInt(id)]);
+    const column = db.get('SELECT * FROM columns WHERE id = ?', [parseInt(id)]);
+    if (!column) return res.status(404).json({ error: 'Column không tồn tại.' });
 
-    res.json({ message: 'Xóa column thành công!' });
+    const board = db.get('SELECT owner_id FROM boards WHERE id = ?', [column.board_id]);
+    
+    const isMember = db.get('SELECT role FROM board_members WHERE board_id = ? AND user_id = ?', [column.board_id, req.session.userId]);
+    if (!isMember && board.owner_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Không có quyền xóa column này.' });
+    }
+
+    // Soft delete the column
+    db.run('UPDATE columns SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [parseInt(id)]);
+    
+    // Also soft delete all cards recursively (technically optional, but good practice so they appear individually in trash)
+    db.run('UPDATE cards SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE column_id = ? AND is_deleted = 0', [parseInt(id)]);
+
+    res.json({ message: 'Đã đưa column vào Thùng rác.' });
+
+    // Socket: thông báo board reload
+    req.app.get('io').to('board-' + column.board_id).emit('board-updated', { action: 'column-deleted' });
   } catch (err) {
-    console.error('Delete column error:', err);
+    console.error('Trash column error:', err);
     res.status(500).json({ error: 'Lỗi server.' });
   }
 });

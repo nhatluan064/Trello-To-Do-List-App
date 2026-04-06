@@ -683,11 +683,17 @@ input, textarea, select, button {
   overflow: hidden;
 }
 
+#kanban-view.active {
+  display: flex !important;
+  flex-direction: column;
+}
+
 .kanban-container {
+  flex: 1;
   display: flex;
   gap: 16px;
-  padding: 20px 16px;
-  height: 100%;
+  padding: 16px;
+  height: auto;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
@@ -1186,6 +1192,8 @@ input, textarea, select, button {
 
 .modal-body {
   padding: 0 24px;
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .modal-input {
@@ -1947,5 +1955,70 @@ input, textarea, select, button {
 /* Ẩn thẻ khi không khớp filter */
 .kanban-card.card-hidden {
   display: none !important;
+}
+
+/* ============================================================
+   RESPONSIVE DESIGN 
+   ============================================================ */
+
+/* Laptop / Màn hình nhỏ (1366x768) */
+@media (max-width: 1400px) {
+  /* Thu gọn không gian phần Nav và Padding */
+  .top-nav {
+    padding: 0 16px;
+    height: 50px;
+  }
+  
+  .board-title-display {
+    font-size: 1rem;
+    padding: 2px 8px;
+  }
+  
+  /* Sửa hộp Modal tránh rớt màn hình thấp */
+  .modal {
+    width: 90%;
+    max-width: 520px;
+    max-height: 85vh; /* Điểm chốt responsive */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .modal-body {
+    overflow-y: auto; /* Kéo thanh cuộn nếu dài */
+    padding: 16px 20px;
+  }
+  
+  .kanban-filter-bar {
+    padding: 8px 12px;
+    gap: 12px;
+  }
+  
+  .filter-group input, .filter-group select {
+    width: 130px;
+  }
+  .filter-group.filter-search input {
+    width: 160px;
+  }
+}
+
+/* Tablet / Mobile (768px) */
+@media (max-width: 768px) {
+  .nav-center {
+    display: none; /* Ẩn bớt logo hoặc tiêu đề cho gọn */
+  }
+
+  .kanban-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-group input, .filter-group select, .filter-group.filter-search input {
+    width: 100%;
+  }
+
+  .kanban-column {
+    min-width: 250px;
+    width: 250px;
+  }
 }
 

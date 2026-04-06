@@ -19,13 +19,13 @@ router.get('/', (req, res) => {
       FROM boards b
       JOIN users u ON b.owner_id = u.id
       LEFT JOIN board_members bm ON b.id = bm.board_id
-      WHERE b.owner_id = ? OR bm.user_id = ?
-      ORDER BY b.updated_at DESC
+      WHERE (b.owner_id = ? OR bm.user_id = ?) AND b.is_deleted = 0
+      ORDER BY b.created_at DESC
     `, [userId, userId]);
 
     const result = boards.map(b => {
-      const colCount = db.get('SELECT COUNT(*) as cnt FROM columns WHERE board_id = ?', [b.id]);
-      const cardCount = db.get('SELECT COUNT(*) as cnt FROM cards c JOIN columns col ON c.column_id = col.id WHERE col.board_id = ?', [b.id]);
+      const colCount = db.get('SELECT COUNT(*) as cnt FROM columns WHERE board_id = ? AND is_deleted = 0', [b.id]);
+      const cardCount = db.get('SELECT COUNT(*) as cnt FROM cards c JOIN columns col ON c.column_id = col.id WHERE col.board_id = ? AND c.is_deleted = 0', [b.id]);
       return {
         id: b.id, title: b.title, description: b.description, background: b.background,
         ownerId: b.owner_id, ownerName: b.owner_name, ownerColor: b.owner_color,
@@ -86,7 +86,7 @@ router.get('/:id', (req, res) => {
 
     const board = db.get(`
       SELECT b.*, u.display_name as owner_name
-      FROM boards b JOIN users u ON b.owner_id = u.id WHERE b.id = ?
+      FROM boards b JOIN users u ON b.owner_id = u.id WHERE b.id = ? AND b.is_deleted = 0
     `, [parseInt(id)]);
 
     if (!board) return res.status(404).json({ error: 'Board không tồn tại.' });
@@ -96,17 +96,15 @@ router.get('/:id', (req, res) => {
       return res.status(403).json({ error: 'Bạn không có quyền truy cập board này.' });
     }
 
-    const columns = db.all('SELECT * FROM columns WHERE board_id = ? ORDER BY position ASC', [parseInt(id)]);
+    const columns = db.all('SELECT * FROM columns WHERE board_id = ? AND is_deleted = 0 ORDER BY position ASC', [parseInt(id)]);
 
     const columnsWithCards = columns.map(col => {
       const cards = db.all(`
         SELECT c.*,
-          u1.display_name as creator_name, u1.avatar_color as creator_color,
-          u2.display_name as assignee_name, u2.avatar_color as assignee_color
+          u1.display_name as creator_name, u1.avatar_color as creator_color
         FROM cards c
         LEFT JOIN users u1 ON c.created_by = u1.id
-        LEFT JOIN users u2 ON c.assigned_to = u2.id
-        WHERE c.column_id = ? ORDER BY c.position ASC
+        WHERE c.column_id = ? AND c.is_deleted = 0 ORDER BY c.position ASC
       `, [col.id]);
 
       return {
@@ -117,11 +115,24 @@ router.get('/:id', (req, res) => {
             FROM labels l JOIN card_labels cl ON l.id = cl.label_id
             WHERE cl.card_id = ?
           `, [c.id]);
+
+          const cardAssignees = db.all(`
+            SELECT u.id, u.username, u.display_name, u.avatar_color
+            FROM users u JOIN card_assignees ca ON u.id = ca.user_id
+            WHERE ca.card_id = ?
+          `, [c.id]);
+
           return {
             id: c.id, title: c.title, description: c.description,
             position: c.position, priority: c.priority, dueDate: c.due_date,
+            startDate: c.start_date, isLongTerm: c.is_long_term === 1,
             createdBy: c.created_by, creatorName: c.creator_name, creatorColor: c.creator_color,
-            assignedTo: c.assigned_to, assigneeName: c.assignee_name, assigneeColor: c.assignee_color,
+            assignees: cardAssignees.map(a => ({
+              id: a.id,
+              username: a.username,
+              displayName: a.display_name,
+              avatarColor: a.avatar_color
+            })),
             labels: cardLabels,
             createdAt: c.created_at, updatedAt: c.updated_at
           };
@@ -187,21 +198,12 @@ router.delete('/:id', (req, res) => {
       return res.status(403).json({ error: 'Chỉ owner hoặc admin mới xóa được board.' });
     }
 
-    // Delete all related data manually (sql.js FK cascade may not work perfectly)
-    const cols = db.all('SELECT id FROM columns WHERE board_id = ?', [parseInt(id)]);
-    cols.forEach(col => {
-      db.run('DELETE FROM comments WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)', [col.id]);
-      db.run('DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)', [col.id]);
-      db.run('DELETE FROM cards WHERE column_id = ?', [col.id]);
-    });
-    db.run('DELETE FROM columns WHERE board_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM labels WHERE board_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM board_members WHERE board_id = ?', [parseInt(id)]);
-    db.run('DELETE FROM boards WHERE id = ?', [parseInt(id)]);
+    // Soft Delete: Just update is_deleted to 1
+    db.run('UPDATE boards SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [parseInt(id)]);
 
-    res.json({ message: 'Xóa board thành công!' });
+    res.json({ message: 'Đã đưa board vào thùng rác.' });
   } catch (err) {
-    console.error('Delete board error:', err);
+    console.error('Trash board error:', err);
     res.status(500).json({ error: 'Lỗi server.' });
   }
 });

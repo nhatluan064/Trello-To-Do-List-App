@@ -58,15 +58,46 @@
 
 ---
 
-## ✅ Phase 3A — Search & Filter (Hoàn thành 2026-04-06)
+## ✅ Phase 3A — Search, Filter & View Enhancement (Hoàn thành 2026-04-06)
 - [x] Thanh tìm kiếm card theo title/description
-- [x] Filter card theo: label, assignee
+- [x] Filter card theo: date, label, assignee
+- [x] Responsive Design cho màn phân giải hẹp (1366x768) tránh hụt Modal
+- [x] Fix gãy layout Cuộn dọc/ngang (Scroll Overflow Cutoff) của danh sách To-Do-List do xung đột Flexbox
+- [x] Hiển thị mặc định Ngày khởi tạo (Created Date) trên giao diện thẻ
 - [x] Tính năng realtime frontend filter, tốc độ phản hồi ngay lập tức, không tốn tài nguyên tải lại API
 - [x] Nút Clear Filter (chỉ xuất hiện khi đang có bộ lọc)
+
+---
+
+## ✅ Phase 4 — Data Safety & Recycle Bin (Hoàn thành 2026-04-06)
+- [x] **Soft Delete Architecture**: Biến lệnh `DELETE` của Board, Column, Card thành cập nhật `is_deleted = 1`.
+- [x] **Auto Cleanup**: Chế độ tự dọn rác đối với dữ liệu quá 7 ngày (`deleted_at < datetime('now', '-7 days')`).
+- [x] **UI & UX**: Modal Custom cực ngầu thay thế `window.confirm()` khô khan của trình duyệt (Dạng Promise Async).
+- [x] **Khôi phục dữ liệu**: Tích hợp UI cho "Thùng rác", tải về toàn bộ thẻ/cột bị xóa và 1 cú Click để Restore.
+- **Lưu ý Cấu trúc**: Việc xóa Nhãn (Labels) hay Nhóm Nội Bộ (Members) trong Bảng vì lý do dọn dẹp kỹ thuật nên sẽ được giữ Hard Delete (Xóa thẳng không cần qua thùng rác).
 - **Files đã sửa**:
-  - `public/index.html`: Thêm Filter Bar UI
-  - `public/css/style.css`: Style cho thanh công cụ và logic `.card-hidden`
-  - `public/js/kanban.js`: Quản lý `this.currentFilters` và hàm `applyFilters()` 
+  - `public/index.html`: Thêm Filter Bar UI gồm Text, Option và Date input
+  - `public/css/style.css`: Media Queries (`max-width: 1366px`) và logic `.card-hidden`
+  - `public/js/kanban.js`: Quản lý `this.currentFilters` và logic xử lý Date Time trên thẻ
+
+---
+
+## ✅ Phase 5 — Form Mẫu Nhanh & Thời Gian Dự Án Dài Hạn (Hoàn thành 2026-04-06)
+- [x] **Cơ sở dữ liệu**: Bổ sung bảng `templates` (id, title, desc). Bổ sung cột `start_date` và `is_long_term` vào bảng `cards`.
+- [x] **Admin Panel**: Phân chia Tab và thiết kế giao diện cho Quản lý Form Mẫu Động.
+- [x] **Giao diện Modal**: Hỗ trợ Dropdown Nạp Form mẫu nhanh chỉ bằng 1 cú Click, thêm lịch chọn Ngày Bắt Đầu (Start Date), thêm Checkbox `[x] Dự Án Dài Hạn`.
+- [x] **Hiển thị Bảng**: Tự động Render giao diện đặc biệt nổi bật (Viền Tím/Chữ To/Thanh Tiến Độ Timeline) khi một thẻ được ghim là Dự Án Dài Hạn.
+- [x] Khắc phục triệt để lỗi Box Chi Tiết Form bị tụt mất đít (Mất nút Bấm) bằng cách fix CSS `max-height` vào class `.modal-body` thay vì Media query.
+
+---
+
+## ✅ Phase 6 — Realtime Collaboration & Đa Assignee (Hoàn thành 2026-04-06)
+- [x] **Multi-Assignee**: Bảng `card_assignees` cho phép gán nhiều người phụ trách 1 thẻ. UI chuyển từ Dropdown đơn sang Multi-Checkbox Picker.
+- [x] **Socket.IO Realtime**: Cài đặt `socket.io`, tích hợp vào `server.js` với Room-based architecture (mỗi Board = 1 Room).
+- [x] **Backend Emit**: Mọi action Create/Update/Delete/Move Card, Create/Delete Column đều phát tín hiệu `board-updated` tới tất cả client đang xem Board đó.
+- [x] **Frontend Listen**: `kanban.js` kết nối Socket, lắng nghe sự kiện và tự động `silentReload()` mà không làm gián đoạn UX.
+- [x] **Avatar Cluster**: Hiển thị tối đa 3 avatar xếp chồng + badge "+N" trên mỗi thẻ ngoài Bảng.
+- [x] **Bug Sweep**: Quét sạch toàn bộ `req.user.id` còn sót → `req.session.userId` (column, trash, template routes).
 
 ---
 

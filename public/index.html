@@ -149,6 +149,11 @@
           </svg>
           <span class="nav-btn-label">Nhãn</span>
         </button>
+        <button class="nav-btn" id="trash-btn" title="Thùng rác">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
         <button class="nav-btn" id="admin-btn" title="Admin Panel" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
@@ -217,6 +222,12 @@
             <option value="">Tất cả thành viên</option>
           </select>
         </div>
+        <div class="filter-group">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <input type="date" id="filter-date" title="Lọc theo ngày" style="width: auto;">
+        </div>
         <button class="btn btn-ghost btn-sm" id="clear-filters-btn" style="display:none; padding:4px 10px;">
           Xóa bộ lọc
         </button>
@@ -230,24 +241,31 @@
     <!-- Admin Panel View -->
     <div id="admin-view" class="view">
       <div class="admin-container">
-        <div class="admin-header">
-          <h2>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            Quản lý Users
-          </h2>
-          <button class="btn btn-primary" id="admin-create-user-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
-              <line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>
-            </svg>
-            Tạo User
-          </button>
+        
+        <!-- Admin Tabs (User vs Templates) -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+          <button class="btn btn-ghost active" id="admin-tab-users" style="color: var(--accent); border-bottom: 2px solid var(--accent); border-radius: 0;">Quản lý Users</button>
+          <button class="btn btn-ghost" id="admin-tab-templates" style="border-radius: 0;">Quản lý Form Mẫu (Templates)</button>
         </div>
-        <div class="admin-users-table" id="admin-users-table">
-          <!-- User list will be rendered here -->
+
+        <!-- USERS TAB -->
+        <div id="admin-users-section">
+          <div class="admin-header">
+            <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Nguồn Nhân Lực</h2>
+            <button class="btn btn-primary" id="admin-create-user-btn">Tạo User Mới</button>
+          </div>
+          <div class="admin-users-table" id="admin-users-table"></div>
+        </div>
+
+        <!-- TEMPLATES TAB -->
+        <div id="admin-templates-section" style="display: none;">
+          <div class="admin-header">
+            <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Kho Mẫu (Templates)</h2>
+            <button class="btn btn-primary" id="admin-create-template-btn">Thêm Mẫu Mới</button>
+          </div>
+          <div class="admin-users-table" id="admin-templates-table">
+            <!-- Template list renders here -->
+          </div>
         </div>
       </div>
     </div>
@@ -302,9 +320,18 @@
         <button class="modal-close" data-close="card-modal">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- Bổ sung Dropdown Templates Nhanh -->
+        <div class="form-group" style="background:#28354c; padding:10px; border-radius:6px; border:1px dashed #6366f1;">
+          <label style="color:var(--accent); font-size:0.8rem;">⚡ Nạp Form Mẫu Nhanh</label>
+          <select id="card-template-select" class="modal-input" style="border-color:rgba(99,102,241,0.3); background:#1e293b;">
+            <option value="">-- Chọn Mẫu Nội Dung (Click để áp dụng) --</option>
+            <!-- Render JS -->
+          </select>
+        </div>
+
         <div class="form-group">
           <label>Tiêu đề</label>
-          <input type="text" id="card-title-input" class="modal-input" placeholder="Tiêu đề card">
+          <input type="text" id="card-title-input" class="modal-input" placeholder="Nhập tiêu đề card">
         </div>
         <div class="form-group">
           <label>Mô tả</label>
@@ -320,17 +347,27 @@
               <option value="urgent">🔴 Khẩn cấp</option>
             </select>
           </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Bắt đầu từ</label>
+            <input type="date" id="card-start-input" class="modal-input">
+          </div>
           <div class="form-group">
             <label>Hạn chót</label>
             <input type="date" id="card-due-input" class="modal-input">
           </div>
         </div>
-        <!-- Assignee Section -->
+        <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="card-long-term-check" style="width:18px;height:18px;cursor:pointer;">
+          <label for="card-long-term-check" style="margin:0;cursor:pointer;color:var(--text-secondary);font-weight:600;">Ghim Đánh dấu đây là dự án dài hạn (Long-term Milestone)</label>
+        </div>
+        <!-- Assignee Section (Multi-select) -->
         <div class="form-group">
-          <label>👤 Người phụ trách</label>
-          <select id="card-assignee-input" class="modal-input">
-            <option value="">-- Chưa phân công --</option>
-          </select>
+          <label>👥 Người phụ trách (chọn nhiều)</label>
+          <div id="card-assignees-picker" class="card-labels-picker">
+            <!-- Assignee checkboxes rendered by JS -->
+          </div>
         </div>
         <!-- Labels Section -->
         <div class="form-group">
@@ -483,6 +520,79 @@
     </div>
   </div>
 
+  <!-- Confirm Modal -->
+  <div class="modal-overlay" id="confirm-modal" style="z-index: 9999;">
+    <div class="modal" style="max-width: 400px; text-align: center;">
+      <div class="modal-header" style="justify-content: center; border-bottom: none;">
+        <h3 style="color: var(--danger);">⚠️ Yêu cầu xác nhận</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message" style="font-size: 1.05rem; margin-bottom: 24px; color: var(--text-primary);">Bạn có chắc chắn muốn thực hiện hành động này?</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button id="confirm-cancel-btn" class="btn btn-ghost" style="flex:1;">Hủy bỏ</button>
+          <button id="confirm-ok-btn" class="btn btn-primary" style="flex:1; background: var(--danger); border-color: var(--danger);">Đồng ý</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trash Modal -->
+  <div class="modal-overlay" id="trash-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🗑️ Thùng rác (7 ngày)</h3>
+        <button class="modal-close" data-close="trash-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div id="trash-actions" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 8px;">
+          <div>
+            <input type="checkbox" id="trash-select-all" style="width: 16px; height: 16px; cursor: pointer; margin-right: 8px; vertical-align: middle;">
+            <label for="trash-select-all" style="cursor: pointer; margin: 0; font-size: 0.9rem;">Chọn tất cả</label>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-ghost btn-sm" id="trash-delete-selected-btn" style="color: var(--danger); padding: 4px 10px;">Xóa vĩnh viễn</button>
+            <button class="btn btn-primary btn-sm" id="trash-restore-selected-btn" style="padding: 4px 10px;">Khôi phục</button>
+          </div>
+        </div>
+        <div id="trash-list" style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Items sẽ được render bằng JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="trash-modal">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Template Modal -->
+  <div class="modal-overlay" id="admin-template-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="template-modal-title">Tạo Mẫu Mới</h3>
+        <button class="modal-close" data-close="admin-template-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Tên Gợi Nhớ (Sẽ hiển thị trong Dropdown)</label>
+          <input type="text" id="template-name-input" class="modal-input" placeholder="VD: Báo Cáo Sáng, Nhân Sự Rớt Mạng...">
+        </div>
+        <div class="form-group">
+          <label>Tiêu đề thẻ mặc định (Tùy chọn)</label>
+          <input type="text" id="template-title-input" class="modal-input" placeholder="VD: [SỰ CỐ]">
+        </div>
+        <div class="form-group">
+          <label>Nội dung mặc định</label>
+          <textarea id="template-desc-input" class="modal-input" rows="6" placeholder="Nhập các đầu mục.&#10;VD:&#10;- Tên Máy:&#10;- Triệu chứng:"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-close="admin-template-modal">Hủy</button>
+        <button class="btn btn-primary" id="template-save-btn">Lưu Mẫu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/board.js"></script>

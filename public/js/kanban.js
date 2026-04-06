@@ -10,19 +10,61 @@ const Kanban = {
   boardMembers: [],
   boardLabels: [],
   activeCardLabels: [],
+  activeCardAssignees: [],
+  socket: null,
   
   // Phase 3A: Search & Filter state
-  currentFilters: { keyword: '', labelId: '', assigneeId: '' },
+  currentFilters: { keyword: '', labelId: '', assigneeId: '', date: '' },
   lastBoardId: null,
+
+  // Socket.IO — kết nối 1 lần duy nhất
+  initSocket() {
+    if (this.socket) return; // Đã kết nối
+    this.socket = io();
+    
+    this.socket.on('connect', () => {
+      console.log('🔌 Realtime connected:', this.socket.id);
+    });
+
+    // Khi server báo board có thay đổi → reload lại board (nếu đang mở)
+    this.socket.on('board-updated', (data) => {
+      console.log('📡 Realtime event:', data.action);
+      // Chỉ reload nếu đang xem board và không đang kéo thả
+      if (this.currentBoard && !this.draggedCard) {
+        this.silentReload();
+      }
+    });
+  },
+
+  // Reload board mà không ảnh hưởng UX (không toast, không đổi view)
+  async silentReload() {
+    if (!this.currentBoard) return;
+    try {
+      const freshBoard = await API.getBoard(this.currentBoard.id);
+      this.currentBoard = freshBoard;
+      this.boardMembers = freshBoard.members || [];
+      this.render();
+    } catch (e) { /* im lặng */ }
+  },
 
   async loadBoard(boardId) {
     try {
+      // Socket: rời room cũ, vào room mới
+      this.initSocket();
+      if (this.lastBoardId && this.lastBoardId !== boardId && this.socket) {
+        this.socket.emit('leave-board', this.lastBoardId);
+      }
+      if (this.socket) {
+        this.socket.emit('join-board', boardId);
+      }
+
       if (this.lastBoardId !== boardId) {
-        this.currentFilters = { keyword: '', labelId: '', assigneeId: '' };
+        this.currentFilters = { keyword: '', labelId: '', assigneeId: '', date: '' };
         this.lastBoardId = boardId;
         
         // Reset DOM inputs for filters
         document.getElementById('filter-keyword').value = '';
+        document.getElementById('filter-date').value = '';
         document.getElementById('clear-filters-btn').style.display = 'none';
       }
 
@@ -113,31 +155,74 @@ const Kanban = {
         ).join('')}</div>`
       : '';
 
-    const dueDateHtml = card.dueDate
-      ? `<span class="card-meta-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    let dateHtml = '';
+    
+    // Xử lý hiển thị ngày tháng
+    if (card.isLongTerm && card.startDate && card.dueDate) {
+      // Dài hạn: Hiển thị thanh tiến độ Start -> End
+      const s = new Date(card.startDate);
+      const e = new Date(card.dueDate);
+      dateHtml = `
+        <div style="background:rgba(182, 110, 255, 0.1); border:1px solid rgba(182,110,255,0.4); border-radius:4px; padding:4px 6px; margin-top:6px; display:inline-flex; align-items:center; gap:6px; width:100%;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" width="14" height="14">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
-          ${new Date(card.dueDate).toLocaleDateString('vi-VN')}
-        </span>`
-      : '';
+          <span style="color:var(--accent); font-size:0.8rem; font-weight:600;">
+            ${s.getDate()}/${s.getMonth()+1} <span style="opacity:0.6; padding:0 2px;">➔</span> ${e.getDate()}/${e.getMonth()+1}/${e.getFullYear()}
+          </span>
+        </div>
+      `;
+    } else {
+      // Ngắn hạn bình thường
+      if (card.dueDate) {
+        dateHtml = `<span class="card-meta-item" style="color: var(--priority-high);" title="Ngày hết hạn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <strong style="margin-left:2px">${new Date(card.dueDate).toLocaleDateString('vi-VN')}</strong>
+          </span>`;
+      } else if (card.startDate) {
+        dateHtml = `<span class="card-meta-item" style="color: var(--text-secondary);" title="Ngày bắt đầu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            </svg>
+            <strong style="margin-left:2px">BĐ: ${new Date(card.startDate).toLocaleDateString('vi-VN')}</strong>
+          </span>`;
+      } else if (card.createdAt) {
+        const createdDate = new Date(card.createdAt);
+        dateHtml = `<span class="card-meta-item" title="Ngày tạo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span style="margin-left:2px">${createdDate.toLocaleDateString('vi-VN')}</span>
+          </span>`;
+      }
+    }
 
-    const assigneeHtml = card.assigneeName
-      ? `<span class="card-assignee-avatar" style="background:${card.assigneeColor}" title="${Board.escapeHtml(card.assigneeName)}">
-          ${card.assigneeName.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
-        </span>`
-      : '';
+    let assigneeHtml = '';
+    if (card.assignees && card.assignees.length > 0) {
+      assigneeHtml = `<div style="display:flex; margin-left:auto;">` +
+        card.assignees.slice(0, 3).map((a, i) =>
+          `<span class="card-assignee-avatar" style="background:${a.avatarColor}; margin-left:${i > 0 ? '-6px' : '0'}; position:relative; z-index:${3-i}; border:2px solid var(--bg-card);" title="${Board.escapeHtml(a.displayName)}">
+            ${a.displayName.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}
+          </span>`
+        ).join('') +
+        (card.assignees.length > 3 ? `<span style="font-size:0.7rem; color:var(--text-tertiary); margin-left:4px; align-self:center;">+${card.assignees.length - 3}</span>` : '') +
+      `</div>`;
+    }
 
     return `
-      <div class="kanban-card" draggable="true" data-card-id="${card.id}" data-card='${JSON.stringify(card).replace(/'/g, "&#39;")}'>
+      <div class="kanban-card ${card.isLongTerm ? 'long-term-card' : ''}" draggable="true" data-card-id="${card.id}" data-card='${JSON.stringify(card).replace(/'/g, "&#39;")}' style="${card.isLongTerm ? 'border:1px solid rgba(182,110,255,0.4);' : ''}">
         <div class="card-priority-bar ${card.priority}"></div>
         ${labelsHtml}
-        <div class="card-title">${Board.escapeHtml(card.title)}</div>
-        <div class="card-meta">
-          ${dueDateHtml}
-          ${card.description ? '<span class="card-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>' : ''}
-          ${assigneeHtml}
+        <div class="card-title" style="${card.isLongTerm ? 'font-size:1.05rem; font-weight:700;' : ''}">${Board.escapeHtml(card.title)}</div>
+        <div class="card-meta" style="${card.isLongTerm ? 'flex-wrap:wrap;' : ''}">
+          ${dateHtml}
+          <div style="display:flex; gap:6px; align-items:center; margin-left:auto;">
+            ${card.description ? '<span class="card-meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>' : ''}
+            ${assigneeHtml}
+          </div>
         </div>
       </div>
     `;
@@ -169,10 +254,11 @@ const Kanban = {
     document.querySelectorAll('[data-delete-column]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const colId = btn.dataset.deleteColumn;
-        if (confirm('Xóa column này? Tất cả thẻ bên trong sẽ bị xóa.')) {
+        const result = await App.confirm('Chuyển column này vào thùng rác? Tất cả thẻ bên trong sẽ đi theo.');
+        if (result) {
           try {
             await API.deleteColumn(colId);
-            App.toast('Xóa column thành công!', 'success');
+            App.toast('Đã đưa column vào thùng rác!', 'success');
             this.loadBoard(this.currentBoard.id);
           } catch (err) {
             App.toast(err.message, 'error');
@@ -375,7 +461,7 @@ const Kanban = {
   editingCardId: null,
   editingCardColumnId: null,
 
-  openCardModal(card) {
+  async openCardModal(card) {
     this.editingCardId = card.id;
     this.editingCardColumnId = card.columnId;
     this.activeCardLabels = (card.labels || []).map(l => l.id);
@@ -384,18 +470,82 @@ const Kanban = {
     document.getElementById('card-title-input').value = card.title || '';
     document.getElementById('card-desc-input').value = card.description || '';
     document.getElementById('card-priority-input').value = card.priority || 'medium';
+    document.getElementById('card-start-input').value = card.startDate || '';
     document.getElementById('card-due-input').value = card.dueDate || '';
+    document.getElementById('card-long-term-check').checked = card.isLongTerm || false;
 
-    // Populate assignee dropdown
-    const assigneeSelect = document.getElementById('card-assignee-input');
-    assigneeSelect.innerHTML = '<option value="">-- Chưa phân công --</option>';
-    this.boardMembers.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = `${m.displayName} (@${m.username})`;
-      if (m.id === card.assignedTo) opt.selected = true;
-      assigneeSelect.appendChild(opt);
-    });
+    // Populate Templates
+    try {
+      const templates = await API.getTemplates();
+      const tplSelect = document.getElementById('card-template-select');
+      tplSelect.innerHTML = '<option value="">-- Chọn Mẫu Nội Dung (Click để áp dụng) --</option>';
+      templates.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = `🚀 ${t.name}`;
+        opt.dataset.title = t.template_title || '';
+        opt.dataset.desc = t.template_desc || '';
+        tplSelect.appendChild(opt);
+      });
+      // Handle template selection
+      tplSelect.onchange = async (e) => {
+        const sOpt = tplSelect.options[tplSelect.selectedIndex];
+        if (!sOpt.value) return;
+        
+        const cTitle = document.getElementById('card-title-input').value;
+        const cDesc = document.getElementById('card-desc-input').value;
+        
+        const applyTemplate = async () => {
+          if (sOpt.dataset.title && !document.getElementById('card-title-input').value.startsWith(sOpt.dataset.title)) {
+             document.getElementById('card-title-input').value = sOpt.dataset.title + ' ' + cTitle;
+          }
+          if (sOpt.dataset.desc) {
+             document.getElementById('card-desc-input').value = document.getElementById('card-desc-input').value + '\n\n' + sOpt.dataset.desc;
+          }
+        };
+
+        if (cTitle || cDesc) {
+           const ok = await App.confirm('Bổ sung mẫu này vào Nội dung hiện có của thẻ?');
+           if (ok) applyTemplate();
+        } else {
+           applyTemplate();
+        }
+        tplSelect.value = ''; // Reset
+      };
+    } catch(err) { console.error('Lỗi tải templates', err); }
+
+    // Populate assignees multi-picker
+    this.activeCardAssignees = (card.assignees || []).map(a => a.id);
+    const assigneePicker = document.getElementById('card-assignees-picker');
+    if (this.boardMembers.length === 0) {
+      assigneePicker.innerHTML = '<span style="color:var(--text-tertiary);font-size:0.83rem">Chưa có thành viên. Mời thành viên trong menu "Thành viên" trên nav.</span>';
+    } else {
+      assigneePicker.innerHTML = this.boardMembers.map(m => {
+        const isActive = this.activeCardAssignees.includes(m.id);
+        const initials = m.displayName.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+        return `<button class="label-toggle-btn ${isActive ? 'active' : ''}"
+          data-assignee-id="${m.id}" style="background:${m.avatarColor}">
+          <span class="label-toggle-check">${isActive ? '✓' : ''}</span>
+          ${Board.escapeHtml(m.displayName)}
+        </button>`;
+      }).join('');
+
+      assigneePicker.querySelectorAll('.label-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const aid = parseInt(btn.dataset.assigneeId);
+          const idx = this.activeCardAssignees.indexOf(aid);
+          if (idx === -1) {
+            this.activeCardAssignees.push(aid);
+            btn.classList.add('active');
+            btn.querySelector('.label-toggle-check').textContent = '✓';
+          } else {
+            this.activeCardAssignees.splice(idx, 1);
+            btn.classList.remove('active');
+            btn.querySelector('.label-toggle-check').textContent = '';
+          }
+        });
+      });
+    }
 
     // Populate labels picker
     const picker = document.getElementById('card-labels-picker');
@@ -465,8 +615,9 @@ const Kanban = {
     const title = document.getElementById('card-title-input').value.trim();
     const description = document.getElementById('card-desc-input').value.trim();
     const priority = document.getElementById('card-priority-input').value;
+    const startDate = document.getElementById('card-start-input').value;
     const dueDate = document.getElementById('card-due-input').value;
-    const assignedTo = document.getElementById('card-assignee-input').value || null;
+    const isLongTerm = document.getElementById('card-long-term-check').checked;
 
     if (!title) {
       App.toast('Vui lòng nhập tiêu đề thẻ.', 'error');
@@ -474,11 +625,14 @@ const Kanban = {
     }
 
     try {
-      // Save basic card info + assignee
-      await API.updateCard(this.editingCardId, {
-        title, description, priority,
-        dueDate: dueDate || null,
-        assignedTo: assignedTo ? parseInt(assignedTo) : null
+      await API.updateCard(this.editingCardId, { 
+        title, 
+        description, 
+        priority, 
+        startDate: startDate || null, 
+        dueDate: dueDate || null, 
+        isLongTerm,
+        assigneeIds: this.activeCardAssignees || []
       });
 
       // Sync labels: get current labels, add new, remove old
@@ -505,11 +659,12 @@ const Kanban = {
 
   async deleteCard() {
     if (!this.editingCardId) return;
-    if (!confirm('Bạn có chắc muốn xóa thẻ này?')) return;
+    const ok = await App.confirm('Chuyển thẻ này vào thùng rác?');
+    if (!ok) return;
 
     try {
       await API.deleteCard(this.editingCardId);
-      App.toast('Xóa thẻ thành công!', 'success');
+      App.toast('Đã đưa thẻ vào thùng rác!', 'success');
       App.closeModal('card-modal');
       this.loadBoard(this.currentBoard.id);
     } catch (err) {
@@ -538,6 +693,7 @@ const Kanban = {
   initFilterDropdowns() {
     const labelSelect = document.getElementById('filter-label');
     const assigneeSelect = document.getElementById('filter-assignee');
+    const dateInput = document.getElementById('filter-date');
     const clearBtn = document.getElementById('clear-filters-btn');
     const keywordInput = document.getElementById('filter-keyword');
 
@@ -580,11 +736,17 @@ const Kanban = {
         this.applyFilters();
       });
 
+      dateInput.addEventListener('change', (e) => {
+        this.currentFilters.date = e.target.value;
+        this.applyFilters();
+      });
+
       clearBtn.addEventListener('click', () => {
-        this.currentFilters = { keyword: '', labelId: '', assigneeId: '' };
+        this.currentFilters = { keyword: '', labelId: '', assigneeId: '', date: '' };
         keywordInput.value = '';
         labelSelect.value = '';
         assigneeSelect.value = '';
+        dateInput.value = '';
         this.applyFilters();
       });
     }
@@ -624,6 +786,20 @@ const Kanban = {
       if (this.currentFilters.assigneeId && isMatch) {
         const assigneeIdNum = parseInt(this.currentFilters.assigneeId);
         if (cardData.assignedTo !== assigneeIdNum) isMatch = false;
+      }
+
+      // Date match (Matches either creation date or due date)
+      if (this.currentFilters.date && isMatch) {
+        const filterDateStr = this.currentFilters.date; // YYYY-MM-DD
+        let hasDateMatch = false;
+        
+        if (cardData.dueDate && cardData.dueDate.startsWith(filterDateStr)) {
+          hasDateMatch = true;
+        } else if (cardData.createdAt && cardData.createdAt.startsWith(filterDateStr)) {
+          hasDateMatch = true;
+        }
+        
+        if (!hasDateMatch) isMatch = false;
       }
 
       // Toggle visibility class

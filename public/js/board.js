@@ -61,10 +61,11 @@ const Board = {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const boardId = btn.dataset.deleteBoard;
-        if (confirm('Bạn có chắc muốn xóa board này? Tất cả columns và cards sẽ bị xóa.')) {
+        const ok = await App.confirm('Chuyển board này vào thùng rác? Tất cả columns và cards sẽ đi theo.');
+        if (ok) {
           try {
             await API.deleteBoard(boardId);
-            App.toast('Xóa board thành công!', 'success');
+            App.toast('Đã đưa board vào thùng rác!', 'success');
             this.loadBoards();
           } catch (err) {
             App.toast(err.message, 'error');

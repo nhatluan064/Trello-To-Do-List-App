@@ -65,19 +65,185 @@ const App = {
   },
 
   // ============================================================
+  // CONFIRM MODAL (Thay thế window.confirm)
+  // ============================================================
+  async confirm(message) {
+    return new Promise((resolve) => {
+      document.getElementById('confirm-message').textContent = message;
+      this.openModal('confirm-modal');
+      
+      const onOk = () => { cleanup(); resolve(true); };
+      const onCancel = () => { cleanup(); resolve(false); };
+      
+      const okBtn = document.getElementById('confirm-ok-btn');
+      const cancelBtn = document.getElementById('confirm-cancel-btn');
+      
+      // Cleanup event listeners
+      const cleanup = () => {
+        this.closeModal('confirm-modal');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+      };
+      
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  },
+
+  // ============================================================
+  // TRASH UI (Thùng Rác)
+  // ============================================================
+  async loadTrash() {
+    this.openModal('trash-modal');
+    const container = document.getElementById('trash-list');
+    const actionsBar = document.getElementById('trash-actions');
+    const selectAllCheckbox = document.getElementById('trash-select-all');
+    
+    container.innerHTML = '<div style="text-align:center; padding: 20px;">Đang tải...</div>';
+    actionsBar.style.display = 'none';
+    selectAllCheckbox.checked = false;
+    
+    try {
+      const res = await API.request('GET', '/trash');
+      if (res.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-tertiary);">Thùng rác trống.</div>';
+        return;
+      }
+      
+      actionsBar.style.display = 'flex';
+      let html = '';
+      res.forEach(item => {
+        const typeMap = { 'board': 'Bảng', 'column': 'Cột', 'card': 'Thẻ' };
+        html += `
+          <div class="trash-item" data-type="${item.type}" data-id="${item.id}" style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <input type="checkbox" class="trash-item-checkbox" style="width:16px; height:16px; cursor:pointer;" value='{"type":"${item.type}","id":${item.id}}'>
+              <div>
+                <div style="font-weight: 700; color: white;">${Board.escapeHtml(item.title)}</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                  Loại: ${typeMap[item.type] || item.type}
+                  ${item.parent_name ? ` • Thuộc: ${Board.escapeHtml(item.parent_name)}` : ''}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--danger); margin-top: 4px;">
+                  Xóa lúc: ${new Date(item.deleted_at).toLocaleString('vi-VN')}
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-ghost btn-sm" onclick="App.deleteTrash('${item.type}', ${item.id})" style="color:var(--danger); flex-shrink: 0;" title="Xóa vĩnh viễn">Xóa</button>
+              <button class="btn btn-primary btn-sm" onclick="App.restoreTrash('${item.type}', ${item.id})" style="flex-shrink: 0;">Khôi phục</button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+
+      // Event listener for select all
+      selectAllCheckbox.onchange = function() {
+        const checks = document.querySelectorAll('.trash-item-checkbox');
+        checks.forEach(c => c.checked = this.checked);
+      };
+
+      // Event checking when individual checkbox changed to update "Select All"
+      document.querySelectorAll('.trash-item-checkbox').forEach(chk => {
+        chk.onchange = () => {
+          const allChecks = document.querySelectorAll('.trash-item-checkbox');
+          const checked = document.querySelectorAll('.trash-item-checkbox:checked');
+          selectAllCheckbox.checked = (allChecks.length === checked.length);
+        };
+      });
+
+      // Bind Batch Actions
+      document.getElementById('trash-restore-selected-btn').onclick = () => App.processBatchTrash('restore');
+      document.getElementById('trash-delete-selected-btn').onclick = () => App.processBatchTrash('delete');
+
+    } catch (err) {
+      console.error(err);
+      App.showToast('Lỗi tải thùng rác', 'error');
+    }
+  },
+
+  async deleteTrash(type, id) {
+    const ok = await App.confirm('Hành động này sẽ XÓA VĨNH VIỄN dữ liệu. Bạn có chắc chắn không?');
+    if (!ok) return;
+    try {
+      await API.request('POST', '/trash/delete-batch', { items: [{ type, id }] });
+      App.showToast('Đã xóa vĩnh viễn!');
+      this.loadTrash(); // Reload danh sách
+    } catch (err) {
+      App.showToast('Lỗi khi xóa', 'error');
+    }
+  },
+
+  async processBatchTrash(actionStr) {
+    const checked = Array.from(document.querySelectorAll('.trash-item-checkbox:checked'));
+    if (checked.length === 0) {
+      App.showToast('Vui lòng chọn ít nhất 1 mục.', 'error');
+      return;
+    }
+    
+    const items = checked.map(c => JSON.parse(c.value));
+    const isDelete = actionStr === 'delete';
+
+    if (isDelete) {
+      const ok = await App.confirm(`Bạn sắp XÓA VĨNH VIỄN ${items.length} mục. Không thể khôi phục. Bạn có chắc không?`);
+      if (!ok) return;
+    }
+
+    try {
+      const endpoint = isDelete ? '/trash/delete-batch' : '/trash/restore-batch';
+      await API.request('POST', endpoint, { items });
+      App.showToast(`Đã ${isDelete ? 'xóa vĩnh viễn' : 'khôi phục'} ${items.length} mục!`);
+      this.loadTrash();
+
+      if (!isDelete) {
+        // Load lại trang tương ứng nếu đang mở Board
+        const isBoardsView = document.getElementById('boards-view').classList.contains('active');
+        const isKanbanView = document.getElementById('kanban-view').classList.contains('active');
+        if (isBoardsView) Board.loadBoards();
+        else if (isKanbanView && Kanban.lastBoardId) Kanban.loadBoard(Kanban.lastBoardId);
+      }
+    } catch (err) {
+      App.showToast(`Lỗi xử lý hàng loạt`, 'error');
+    }
+  },
+
+  async restoreTrash(type, id) {
+    try {
+      await API.request('POST', '/trash/restore', { type, id });
+      App.showToast('Đã khôi phục dữ liệu!');
+      this.loadTrash(); // Reload danh sách
+      
+      // Load lại trang tương ứng nếu đang mở Board
+      const isBoardsView = document.getElementById('boards-view').classList.contains('active');
+      const isKanbanView = document.getElementById('kanban-view').classList.contains('active');
+      
+      if (isBoardsView) Board.loadBoards();
+      else if (isKanbanView && Kanban.lastBoardId) Kanban.loadBoard(Kanban.lastBoardId);
+    } catch (err) {
+      App.showToast('Lỗi khôi phục', 'error');
+    }
+  },
+
+  // ============================================================
   // GLOBAL EVENTS
   // ============================================================
   bindGlobalEvents() {
     Auth.init();
 
-    // Nav Home
+    // Custom Triggers: Home & Trash
     document.getElementById('nav-home-btn').addEventListener('click', () => {
       this.showView('boards');
     });
 
+    const trashBtn = document.getElementById('trash-btn');
+    if (trashBtn) trashBtn.addEventListener('click', () => this.loadTrash());
+
     // Admin panel
-    document.getElementById('admin-btn').addEventListener('click', () => {
+    document.getElementById('admin-btn')?.addEventListener('click', () => {
       this.showView('admin');
+      this.initAdmin(); // Initialize tabs & events
+      this.loadAdminUsers(); // Default load current tab
     });
 
     // User dropdown
@@ -235,6 +401,37 @@ const App = {
   // ADMIN FUNCTIONS
   // ============================================================
   resetUserId: null,
+  editingTemplateId: null,
+
+  async initAdmin() {
+    // Check if we already bound
+    if (this._adminBound) return;
+    this._adminBound = true;
+
+    document.getElementById('admin-tab-users').addEventListener('click', (e) => {
+      e.target.classList.add('active');
+      document.getElementById('admin-tab-templates').classList.remove('active');
+      document.getElementById('admin-users-section').style.display = 'block';
+      document.getElementById('admin-templates-section').style.display = 'none';
+      this.loadAdminUsers();
+    });
+
+    document.getElementById('admin-tab-templates').addEventListener('click', (e) => {
+      e.target.classList.add('active');
+      document.getElementById('admin-tab-users').classList.remove('active');
+      document.getElementById('admin-users-section').style.display = 'none';
+      document.getElementById('admin-templates-section').style.display = 'block';
+      this.loadAdminTemplates();
+    });
+
+    document.getElementById('admin-create-template-btn').addEventListener('click', () => {
+      this.openTemplateModal();
+    });
+
+    document.getElementById('template-save-btn').addEventListener('click', () => {
+      this.adminSaveTemplate();
+    });
+  },
 
   async loadAdminUsers() {
     try {
@@ -321,6 +518,79 @@ const App = {
   },
 
   // ============================================================
+  // ADMIN TEMPLATES
+  // ============================================================
+  async loadAdminTemplates() {
+    try {
+      const templates = await API.getTemplates();
+      const table = document.getElementById('admin-templates-table');
+      if (templates.length === 0) {
+        table.innerHTML = '<div style="padding:20px; text-align:center;">Chưa có form mẫu nào.</div>';
+        return;
+      }
+      
+      table.innerHTML = templates.map(t => `
+        <div class="admin-user-row" style="align-items:flex-start;">
+          <div class="admin-user-info" style="flex:1;">
+            <span class="name">🚀 ${Board.escapeHtml(t.name)}</span>
+            <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">Tiêu đề: ${Board.escapeHtml(t.template_title || '(Trống)')}</div>
+            <pre style="font-size:0.8rem; color:var(--text-tertiary); margin-top:4px; max-height: 60px; overflow:hidden; text-overflow:ellipsis;">${Board.escapeHtml(t.template_desc || '')}</pre>
+          </div>
+          <div class="admin-actions">
+            <button class="admin-action-btn" onclick='App.openTemplateModal(${JSON.stringify(t).replace(/'/g, "&#39;")})'>Sửa</button>
+            <button class="admin-action-btn danger" onclick="App.deleteTemplate(${t.id})">Xóa</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      App.toast(err.message, 'error');
+    }
+  },
+
+  openTemplateModal(t = null) {
+    this.editingTemplateId = t ? t.id : null;
+    document.getElementById('template-modal-title').textContent = t ? 'Sửa Form Mẫu' : 'Tạo Form Mẫu Mới';
+    document.getElementById('template-name-input').value = t ? t.name : '';
+    document.getElementById('template-title-input').value = t ? t.template_title : '';
+    document.getElementById('template-desc-input').value = t ? t.template_desc : '';
+    this.openModal('admin-template-modal');
+  },
+
+  async adminSaveTemplate() {
+    const name = document.getElementById('template-name-input').value;
+    const template_title = document.getElementById('template-title-input').value;
+    const template_desc = document.getElementById('template-desc-input').value;
+
+    if (!name.trim()) return App.toast('Tên gợi nhớ là bắt buộc', 'error');
+
+    try {
+      if (this.editingTemplateId) {
+        await API.updateTemplate(this.editingTemplateId, { name, template_title, template_desc });
+        App.toast('Cập nhật mẫu thành công!', 'success');
+      } else {
+        await API.createTemplate({ name, template_title, template_desc });
+        App.toast('Tạo mẫu mới thành công!', 'success');
+      }
+      this.closeModal('admin-template-modal');
+      this.loadAdminTemplates();
+    } catch (err) {
+      App.toast(err.message, 'error');
+    }
+  },
+
+  async deleteTemplate(id) {
+    const ok = await this.confirm('Bạn có chắc muốn xóa vĩnh viễn Form mẫu này?');
+    if (!ok) return;
+    try {
+      await API.deleteTemplate(id);
+      App.toast('Xóa mẫu thành công!', 'success');
+      this.loadAdminTemplates();
+    } catch (err) {
+      App.toast(err.message, 'error');
+    }
+  },
+
+  // ============================================================
   // MEMBERS MANAGEMENT
   // ============================================================
   async openMembersModal() {
@@ -354,7 +624,8 @@ const App = {
       memberList.querySelectorAll('[data-remove-member]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const userId = parseInt(btn.dataset.removeMember);
-          if (!confirm('Xóa thành viên này khỏi board?')) return;
+          const ok = await App.confirm('Chắc chắn muốn xóa thành viên này khỏi board?');
+          if (!ok) return;
           try {
             const result = await API.removeBoardMember(boardId, userId);
             App.toast(result.message, 'success');
@@ -430,7 +701,8 @@ const App = {
       labelsList.querySelectorAll('[data-delete-label]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const labelId = parseInt(btn.dataset.deleteLabel);
-          if (!confirm('Xóa nhãn này? Các card đang dùng nhãn này sẽ bị gỡ nhãn.')) return;
+          const ok = await App.confirm('Xóa nhãn này vĩnh viễn? Các card đang dùng nhãn này sẽ bị mất nhãn (Hành động này không qua thùng rác).');
+          if (!ok) return;
           try {
             await API.deleteLabel(labelId);
             App.toast('Xóa nhãn thành công!', 'success');

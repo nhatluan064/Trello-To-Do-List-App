@@ -37,13 +37,36 @@ class Database {
     this.createTables();
     this.seedAdmin();
     this.save();
-    this.ready = true;
+    // Run cleanup for 7-day trash bin
+    this.cleanTrashBin();
 
     // Auto-save every 30 seconds
     setInterval(() => this.save(), 30000);
 
+    // Auto-clean trash every 1 hour (3600000 ms)
+    setInterval(() => this.cleanTrashBin(), 3600000);
+
     console.log('✅ Database initialized');
     return this;
+  }
+
+  cleanTrashBin() {
+    if (!this.db) return;
+    try {
+      const purgeThreshold = "datetime('now', '-7 days')";
+      let changed = false;
+      
+      const r1 = this.db.run(`DELETE FROM cards WHERE is_deleted = 1 AND deleted_at < ${purgeThreshold}`);
+      const r2 = this.db.run(`DELETE FROM columns WHERE is_deleted = 1 AND deleted_at < ${purgeThreshold}`);
+      const r3 = this.db.run(`DELETE FROM boards WHERE is_deleted = 1 AND deleted_at < ${purgeThreshold}`);
+      
+      if (this.db.getRowsModified() > 0) {
+        console.log('🗑️  Cleaned up old trash items.');
+        this.save();
+      }
+    } catch(e) {
+      console.error('Error cleaning trash:', e);
+    }
   }
 
   save() {
@@ -124,6 +147,8 @@ class Database {
         description TEXT DEFAULT '',
         background TEXT DEFAULT 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         owner_id INTEGER NOT NULL,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (owner_id) REFERENCES users(id)
@@ -148,6 +173,8 @@ class Database {
         board_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         position INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
       )
@@ -161,9 +188,13 @@ class Database {
         description TEXT DEFAULT '',
         position INTEGER NOT NULL DEFAULT 0,
         priority TEXT DEFAULT 'medium',
+        start_date TEXT,
         due_date TEXT,
+        is_long_term INTEGER DEFAULT 0,
         created_by INTEGER NOT NULL,
         assigned_to INTEGER,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE CASCADE,
@@ -193,6 +224,16 @@ class Database {
     `);
 
     this.db.run(`
+      CREATE TABLE IF NOT EXISTS card_assignees (
+        card_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        PRIMARY KEY (card_id, user_id),
+        FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         card_id INTEGER NOT NULL,
@@ -204,11 +245,34 @@ class Database {
       )
     `);
 
+    // Templates for quick forms
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        template_title TEXT,
+        template_desc TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )
+    `);
+
     // Indexes
     try { this.db.run('CREATE INDEX IF NOT EXISTS idx_columns_board ON columns(board_id)'); } catch(e) {}
     try { this.db.run('CREATE INDEX IF NOT EXISTS idx_cards_column ON cards(column_id)'); } catch(e) {}
     try { this.db.run('CREATE INDEX IF NOT EXISTS idx_board_members_user ON board_members(user_id)'); } catch(e) {}
     try { this.db.run('CREATE INDEX IF NOT EXISTS idx_comments_card ON comments(card_id)'); } catch(e) {}
+
+    // Migrations for existing databases
+    try { this.db.run('ALTER TABLE boards ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch(e) {}
+    try { this.db.run('ALTER TABLE boards ADD COLUMN deleted_at DATETIME'); } catch(e) {}
+    try { this.db.run('ALTER TABLE columns ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch(e) {}
+    try { this.db.run('ALTER TABLE columns ADD COLUMN deleted_at DATETIME'); } catch(e) {}
+    try { this.db.run('ALTER TABLE cards ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch(e) {}
+    try { this.db.run('ALTER TABLE cards ADD COLUMN deleted_at DATETIME'); } catch(e) {}
+    try { this.db.run('ALTER TABLE cards ADD COLUMN start_date TEXT'); } catch(e) {}
+    try { this.db.run('ALTER TABLE cards ADD COLUMN is_long_term INTEGER DEFAULT 0'); } catch(e) {}
   }
 
   // ============================================================
